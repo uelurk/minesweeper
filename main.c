@@ -2,10 +2,11 @@
 #include <malloc.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-#define ROWS 20
+#define ROWS 30
 #define COLS 40
-#define MINES 100
+#define MINES 200
 #define SHOWMINES false
 
 typedef struct {
@@ -82,6 +83,39 @@ void FreeSpace(Cell*** Grid, int x, int y) {
         }
     }   
 }
+void FreeSpaceNum(Cell*** Grid, int x, int y) {
+    int di[] = {-1, -1, -1,  0, 0,  1, 1, 1};
+    int dj[] = { 1,  0, -1, -1, 1, -1, 0, 1};
+    int flags = 0;
+    if((*Grid)[x][y].mineCount == 0) {
+        return;
+    }
+    for (int k = 0; k < 8; k++) {
+        int nX = x + di[k];
+        int nY = y + dj[k];
+        if(nX >= 0 && nX < ROWS && nY >= 0 && nY < COLS) {
+            if((*Grid)[nX][nY].isFlagged) {
+                flags++;
+            }
+        }
+    }
+    if((*Grid)[x][y].mineCount == flags) {
+        for (int k = 0; k < 8; k++) {
+            int nX = x + di[k];
+            int nY = y + dj[k];
+            if(nX >= 0 && nX < ROWS && nY >= 0 && nY < COLS) {
+                if(
+                    !(*Grid)[nX][nY].isMine &&
+                    !(*Grid)[nX][nY].isFlagged &&
+                    !(*Grid)[nX][nY].isRevealed   
+                ) {
+                    (*Grid)[nX][nY].isRevealed = true;
+                    FreeSpace(Grid, nX, nY);
+                }
+            }
+        }   
+    }
+}
 
 void PlaceMines(Cell*** Grid) {
     srand(time(0));
@@ -103,7 +137,7 @@ int main(void) {
 
     bool fail = false;
     
-    int CellSize = 30;
+    int CellSize = 32;
     InitWindow(COLS*CellSize, ROWS*CellSize, "Minesweeper");
     SetTargetFPS(60);
 
@@ -118,9 +152,11 @@ int main(void) {
                 }
                 if(Grid[clickedRow][clickedCol].isFlagged) {
                     Grid[clickedRow][clickedCol].isFlagged = false;
-                } else {
+                } else if (!Grid[clickedRow][clickedCol].isRevealed) {
                     Grid[clickedRow][clickedCol].isRevealed = true; // testing
                     FreeSpace(&Grid, clickedRow, clickedCol);
+                } else if (Grid[clickedRow][clickedCol].isRevealed && Grid[clickedRow][clickedCol].mineCount > 0) {
+                    FreeSpaceNum(&Grid, clickedRow, clickedCol);
                 }
                 TraceLog(LOG_INFO, "%d %d", clickedCol, clickedRow);
             }
@@ -172,14 +208,16 @@ int main(void) {
                     }
                     if (Grid[i][j].isRevealed) {
                         DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize, WHITE);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize/7, LIGHTGRAY);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize/7, CellSize, LIGHTGRAY);
                         if(Grid[i][j].mineCount > 0) {
                             char num[4];
                             snprintf(num, sizeof(num), "%d", Grid[i][j].mineCount);
-                            DrawText(num, j*CellSize, i*CellSize, 30, BLACK);
+                            DrawText(num, j*CellSize + 5, i*CellSize+2, 30, BLACK);
                         }
                     }
                     if (Grid[i][j].isFlagged) {
-                        DrawRectangle(j*CellSize, i*CellSize, CellSize/2, CellSize, RED);
+                        DrawRectangle(j*CellSize+8, i*CellSize, CellSize/2, CellSize, RED);
                     }
                     // #testing
                 }
