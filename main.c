@@ -4,10 +4,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define ROWS 30
+#define ROWS 20
 #define COLS 40
-#define MINES 200
+#define MINES 150
 #define SHOWMINES false
+
+
+
+bool fail = false;
+bool win = false;
 
 typedef struct {
     bool isMine;
@@ -105,10 +110,12 @@ void FreeSpaceNum(Cell*** Grid, int x, int y) {
             int nY = y + dj[k];
             if(nX >= 0 && nX < ROWS && nY >= 0 && nY < COLS) {
                 if(
-                    !(*Grid)[nX][nY].isMine &&
                     !(*Grid)[nX][nY].isFlagged &&
                     !(*Grid)[nX][nY].isRevealed   
                 ) {
+                    if((*Grid)[nX][nY].isMine) {
+                        fail = true;
+                    }
                     (*Grid)[nX][nY].isRevealed = true;
                     FreeSpace(Grid, nX, nY);
                 }
@@ -128,35 +135,54 @@ void PlaceMines(Cell*** Grid) {
             i--;
         }
     }
-} 
+}
+
+void CheckWin(Cell*** Grid) {
+    int unrevealedCells = 0;
+    for(int i = 0; i < ROWS; i++) {
+        for(int j = 0; j < COLS; j++) {
+            if(!(*Grid)[i][j].isRevealed) {
+                unrevealedCells++;
+            }
+        }
+    }
+    if(unrevealedCells == MINES) {
+        win = true;
+    }
+}
 
 int main(void) {
     Cell** Grid = InitGrid(ROWS, COLS);
     PlaceMines(&Grid);
     CountAndPlaceNumbers(&Grid);
-
-    bool fail = false;
     
     int CellSize = 32;
     InitWindow(COLS*CellSize, ROWS*CellSize, "Minesweeper");
     SetTargetFPS(60);
 
+
+    float hue = 0.0f;
     while(!WindowShouldClose()) {
-        if(!fail) {
+        hue += 1.0f;
+        if (hue > 360) hue = 0;
+        Color iridescentColor = ColorFromHSV(hue, 0.7f, 0.9f); 
+        CheckWin(&Grid);
+        if(!fail && !win) {
             if(IsKeyPressed(KEY_A)) {
                 Vector2 clickPos = GetMousePosition();
                 int clickedCol = (int)clickPos.x / CellSize;
                 int clickedRow = (int)clickPos.y / CellSize;
-                if(Grid[clickedRow][clickedCol].isMine && !Grid[clickedRow][clickedCol].isFlagged) {
-                    fail = true;
-                }
-                if(Grid[clickedRow][clickedCol].isFlagged) {
-                    Grid[clickedRow][clickedCol].isFlagged = false;
-                } else if (!Grid[clickedRow][clickedCol].isRevealed) {
-                    Grid[clickedRow][clickedCol].isRevealed = true; // testing
-                    FreeSpace(&Grid, clickedRow, clickedCol);
-                } else if (Grid[clickedRow][clickedCol].isRevealed && Grid[clickedRow][clickedCol].mineCount > 0) {
-                    FreeSpaceNum(&Grid, clickedRow, clickedCol);
+                if(!Grid[clickedRow][clickedCol].isFlagged) {
+                    if(Grid[clickedRow][clickedCol].isMine && !Grid[clickedRow][clickedCol].isFlagged) {
+                        fail = true;
+                        continue;
+                    }
+                    if (!Grid[clickedRow][clickedCol].isRevealed) {
+                        Grid[clickedRow][clickedCol].isRevealed = true; // testing
+                        FreeSpace(&Grid, clickedRow, clickedCol);
+                    } else if (Grid[clickedRow][clickedCol].isRevealed && Grid[clickedRow][clickedCol].mineCount > 0) {
+                        FreeSpaceNum(&Grid, clickedRow, clickedCol);
+                    }
                 }
                 TraceLog(LOG_INFO, "%d %d", clickedCol, clickedRow);
             }
@@ -175,6 +201,7 @@ int main(void) {
         }
         if(IsKeyPressed(KEY_R)) {
             fail = false;
+            win = false;
             free(Grid);
             Grid = InitGrid(ROWS, COLS);
             PlaceMines(&Grid);
@@ -199,25 +226,53 @@ int main(void) {
                     }
                     DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize, col);
                     if(fail) {
-                        DrawText("DEAD - PRESS R TO RESTART", 50, 50, 50, BLACK);
-                        
+                        char* msg = "DEAD - PRESS R TO RESTART";
+                        int textX = 50;
+                        int textY = 50;
+                        int textSize = 50;
+                        DrawText(msg, textX+3, textY, textSize, BLACK);
+                        DrawText(msg, textX-3, textY, textSize, BLACK);
+                        DrawText(msg, textX, textY+3, textSize, BLACK);
+                        DrawText(msg, textX, textY-3, textSize, BLACK);
+                        DrawText(msg, textX, textY, textSize, WHITE);
                     }   
                     // testing
                     if (Grid[i][j].isMine && SHOWMINES) {
-                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize, BLUE);
+                        DrawCircle(j*CellSize + CellSize/2, i*CellSize + CellSize/2, CellSize/3, BLACK);
+                        DrawCircle(j*CellSize + CellSize/2, i*CellSize + CellSize/2, CellSize/3-2, RED);
                     }
                     if (Grid[i][j].isRevealed) {
                         DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize, WHITE);
-                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize/7, LIGHTGRAY);
-                        DrawRectangle(j*CellSize, i*CellSize, CellSize/7, CellSize, LIGHTGRAY);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize/15, LIGHTGRAY);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize/15, CellSize, LIGHTGRAY);
+
                         if(Grid[i][j].mineCount > 0) {
                             char num[4];
                             snprintf(num, sizeof(num), "%d", Grid[i][j].mineCount);
-                            DrawText(num, j*CellSize + 5, i*CellSize+2, 30, BLACK);
+                            DrawText(num, j*CellSize + 5, i*CellSize+2, 30, BLUE);
                         }
                     }
                     if (Grid[i][j].isFlagged) {
-                        DrawRectangle(j*CellSize+8, i*CellSize, CellSize/2, CellSize, RED);
+                        DrawText("P", j*CellSize + 5, i*CellSize+2, 30, RED);
+                        //DrawRectangle(j*CellSize+8, i*CellSize, CellSize/2, CellSize, RED);
+                    }
+                    if (Grid[i][j].isMine && fail) {
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize, WHITE);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize, CellSize/15, LIGHTGRAY);
+                        DrawRectangle(j*CellSize, i*CellSize, CellSize/15, CellSize, LIGHTGRAY);
+                        DrawCircle(j*CellSize + CellSize/2, i*CellSize + CellSize/2, CellSize/3, BLACK);
+                        DrawCircle(j*CellSize + CellSize/2, i*CellSize + CellSize/2, CellSize/3-2, RED);
+                    }
+                    if(win) {
+                        char* msg = "WIN";
+                        int textX = 100;
+                        int textY = 100;
+                        int textSize = 100;
+                        DrawText(msg, textX+3, textY, textSize, BLACK);
+                        DrawText(msg, textX-3, textY, textSize, BLACK);
+                        DrawText(msg, textX, textY+3, textSize, BLACK);
+                        DrawText(msg, textX, textY-3, textSize, BLACK);
+                        DrawText(msg, textX, textY, textSize, iridescentColor);
                     }
                     // #testing
                 }
