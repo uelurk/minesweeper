@@ -9,10 +9,14 @@
 #define MINES 150
 #define SHOWMINES false
 
+// possible directions around cell
+const int di[] = {-1, -1, -1,  0, 0,  1, 1, 1};
+const int dj[] = { 1,  0, -1, -1, 1, -1, 0, 1};
 
-
+unsigned int seed = 0;
 bool fail = false;
 bool win = false;
+bool firstClick = true;
 
 typedef struct {
     bool isMine;
@@ -39,10 +43,6 @@ Cell** InitGrid(int rows, int cols) {
     return array;
 }
 void CountAndPlaceNumbers(Cell*** Grid) {
-    // possible directions around cell
-    int di[] = {-1,-1,-1,0,0,1,1,1};
-    int dj[] = {1,0,-1,-1,1,-1,0,1};
-
     for(int i = 0; i < ROWS; i++) {
         for(int j = 0; j < COLS; j++) {
             if((*Grid)[i][j].isMine) {
@@ -62,9 +62,6 @@ void CountAndPlaceNumbers(Cell*** Grid) {
     }
 }
 void FreeSpace(Cell*** Grid, int x, int y) {
-    int di[] = {-1, -1, -1,  0, 0,  1, 1, 1};
-    int dj[] = { 1,  0, -1, -1, 1, -1, 0, 1};
-
     if(!(*Grid)[x][y].isRevealed || (*Grid)[x][y].isMine || (*Grid)[x][y].isFlagged) {
         return;
     }
@@ -89,8 +86,6 @@ void FreeSpace(Cell*** Grid, int x, int y) {
     }   
 }
 void FreeSpaceNum(Cell*** Grid, int x, int y) {
-    int di[] = {-1, -1, -1,  0, 0,  1, 1, 1};
-    int dj[] = { 1,  0, -1, -1, 1, -1, 0, 1};
     int flags = 0;
     if((*Grid)[x][y].mineCount == 0) {
         return;
@@ -124,12 +119,18 @@ void FreeSpaceNum(Cell*** Grid, int x, int y) {
     }
 }
 
-void PlaceMines(Cell*** Grid) {
-    srand(time(0));
+void PlaceMines(Cell*** Grid, int x, int y) {
+    srand(seed);
     for(int i = 0; i < MINES; i++) {
         int randomRow = (rand() % ROWS);
         int randomCol = (rand() % COLS);
-        if(!(*Grid)[randomRow][randomCol].isMine) {
+
+        bool inSaveZone = false;
+        if (randomRow >= x - 1 && randomRow <= x + 1 &&
+            randomCol >= y - 1 && randomCol <= y + 1) {
+            inSaveZone = true;
+        }
+        if(!(*Grid)[randomRow][randomCol].isMine && !inSaveZone) {
             (*Grid)[randomRow][randomCol].isMine = true;
         } else {
             i--;
@@ -151,10 +152,15 @@ void CheckWin(Cell*** Grid) {
     }
 }
 
+void FreeGrid(Cell** array, int rows) {
+    for(int i = 0; i < rows; i++) {
+        free(array[i]);
+    }
+    free(array);
+}
+
 int main(void) {
     Cell** Grid = InitGrid(ROWS, COLS);
-    PlaceMines(&Grid);
-    CountAndPlaceNumbers(&Grid);
     
     int CellSize = 32;
     InitWindow(COLS*CellSize, ROWS*CellSize, "Minesweeper");
@@ -172,6 +178,12 @@ int main(void) {
                 Vector2 clickPos = GetMousePosition();
                 int clickedCol = (int)clickPos.x / CellSize;
                 int clickedRow = (int)clickPos.y / CellSize;
+
+                if(firstClick) {
+                    PlaceMines(&Grid, clickedRow, clickedCol);
+                    CountAndPlaceNumbers(&Grid);
+                    firstClick = false;
+                }
                 if(!Grid[clickedRow][clickedCol].isFlagged) {
                     if(Grid[clickedRow][clickedCol].isMine && !Grid[clickedRow][clickedCol].isFlagged) {
                         fail = true;
@@ -202,10 +214,10 @@ int main(void) {
         if(IsKeyPressed(KEY_R)) {
             fail = false;
             win = false;
-            free(Grid);
+            firstClick = true;
+            seed++;
+            FreeGrid(Grid, ROWS);
             Grid = InitGrid(ROWS, COLS);
-            PlaceMines(&Grid);
-            CountAndPlaceNumbers(&Grid);
         }
         BeginDrawing();
             for(int i = 0; i < ROWS; i++) {
