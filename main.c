@@ -120,7 +120,7 @@ void FreeSpaceNum(Cell*** Grid, int x, int y) {
 }
 
 void PlaceMines(Cell*** Grid, int x, int y) {
-    srand(seed);
+    srand(seed + time(0));
     for(int i = 0; i < MINES; i++) {
         int randomRow = (rand() % ROWS);
         int randomCol = (rand() % COLS);
